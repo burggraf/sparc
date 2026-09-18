@@ -1,5 +1,7 @@
 //! Experimental local artifact packaging, not a Supabase backup implementation.
 
+pub mod database;
+
 use std::{
     collections::BTreeSet,
     fs::{self, DirBuilder, File, OpenOptions},

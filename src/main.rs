@@ -18,7 +18,10 @@ Usage:
   sparc pack SOURCE_DIR ARCHIVE_DIR RECIPIENT
   sparc verify ARCHIVE_DIR IDENTITY_FILE
   sparc unpack ARCHIVE_DIR DESTINATION_DIR IDENTITY_FILE
+  sparc plan-database INPUT.json
 
+Plan-database reads only non-secret declarations and prints an offline JSON plan.
+Success means valid input, not export readiness or a verified restore.
 All output destinations must be new; existing directories are never merged.
 Keep the unencrypted recovery identity outside the source, archive, and Git.
 Pack a quiet folder of synthetic artifacts first. Unpack never executes files.
@@ -40,6 +43,12 @@ fn run() -> Result<()> {
     let args: Vec<_> = env::args_os().skip(1).collect();
     match args.as_slice() {
         [flag] if flag == "--help" || flag == "-h" => println!("{HELP}"),
+        [command, input] if command == "plan-database" => {
+            let plan = sparc::database::plan_database_file(Path::new(input))?;
+            serde_json::to_writer_pretty(std::io::stdout().lock(), &plan)
+                .context("cannot write database plan")?;
+            println!();
+        }
         [command, path] if command == "keygen" => {
             let path = Path::new(path);
             let parent = path
