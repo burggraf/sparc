@@ -15,6 +15,7 @@ See the [high-level product plan](docs/plans/2026-09-18-supabase-project-archive
 - **Desktop:** Tauri 2, macOS first.
 - **UI:** React + TypeScript + Vite SPA with shadcn/ui.
 - **Engine:** Shared Rust core with a thin CLI.
+- **Initial validation target:** Databases up to 10 GB and stored files up to 100 GB; not yet benchmarked or verified.
 - **Privacy:** Local-first execution and full archive encryption by default.
 - **Safety:** Restore to new, empty projects; explicitly report missing or non-exportable material.
 

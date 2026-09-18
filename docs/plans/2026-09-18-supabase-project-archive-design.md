@@ -25,6 +25,7 @@ The product promise should be **“a portable recovery package with explicit cov
 - Each archive covers one project/branch. Additional branches are separately selectable archives, not silently assumed to be included.
 - The archive can be inspected offline. Restoration still requires connectivity to Supabase and any external services being reconnected.
 - Full independent archives come first. Incremental backups, continuous replication, zero-downtime migration, and point-in-time recovery are not initial requirements.
+- The initial validated size target is a database up to **10 GB** and stored files up to **100 GB**, selected by the user. This is a test/support envelope, not a hard archive-format limit or a performance claim; object-count limits and recovery-time measurements remain to be established.
 - The source is not deleted, paused, reset, or otherwise changed by default.
 
 ## 2. Important findings from current documentation
@@ -478,7 +479,7 @@ Use deliberately configured disposable projects with representative data, Auth, 
 
 Deliver:
 
-- A tested coverage matrix and exact unsupported cases, with representative small/medium/large project size and recovery-time measurements.
+- A tested coverage matrix and exact unsupported cases, with small-fixture round trips followed by scale measurements toward the selected **10 GB database / 100 GB stored-files** target. Record object counts, elapsed recovery time, peak memory and temporary disk needs; larger benchmarks are deferred.
 - Credential/redaction behavior by endpoint and supported release.
 - A round-trip database/Auth/Storage/functions procedure, including side-effect suppression.
 - Root-key transfer and Vault decryption proof.
@@ -538,9 +539,9 @@ Confirmed platform decisions and working defaults:
 5. **Safety:** New empty projects only; never overwrite a live project or delete the source automatically.
 6. **Protection:** Full encryption by default; selected-section mode is an advanced option.
 7. **Fidelity:** Core service round trips first, all other features inventoried with explicit manual/unsupported status.
-8. **Scale envelope:** Decide expected database size, object count and downtime tolerance after the first feasibility results; avoid promising arbitrary scale.
+8. **Scale envelope — approved:** Initially validate databases up to **10 GB** and stored files up to **100 GB**. Establish object-count coverage, recovery time and downtime tolerance through feasibility measurements rather than promising arbitrary scale.
 
-Next, define the initial project-size envelope and Phase 0 test setup, then write a bounded macOS feasibility implementation plan. Resolve Docker-free tool packaging, dependency-complete function export, Storage ownership fidelity and encrypted archive resumption before building the full wizard. The first live round trip needs explicitly authorized disposable projects and a cost ceiling; credentials and generated archives must never be committed to this public repository.
+Next, define the Phase 0 test setup and write a bounded macOS feasibility implementation plan. Resolve Docker-free tool packaging, dependency-complete function export, Storage ownership fidelity and encrypted archive resumption before building the full wizard. The first live round trip needs explicitly authorized disposable projects and a cost ceiling; credentials and generated archives must never be committed to this public repository.
 
 ## Sources
 
