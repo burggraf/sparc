@@ -54,6 +54,10 @@ An older dump client than source violates PostgreSQL's restriction; a newer clie
 
 Shared API: `sparc::database::plan_database(&[u8])` and `plan_database_file(&Path)`. See the [bounded implementation plan and retained upstream hazards](docs/plans/2026-09-18-database-feasibility.md) for fixed source provenance, proposed artifacts, exclusions and future live-test gates. In particular, Supabase CLI dry-run is **not** a safe offline probe: it can resolve connections, cause side effects and print passwords.
 
+## Developer-only hosted fixture experiment
+
+An explicitly authorized operator can rehearse one synthetic, schema-scoped native PostgreSQL 17 fixture through the existing encrypted archive CLI. See the [bounded rehearsal plan, safety requirements, and parent-only commands](docs/plans/2026-09-18-hosted-database-rehearsal.md). This is **not** the Supabase dump recipe, native/CLI parity, full database recovery, or Auth recovery. Its Python fake-process tests are offline; no hosted operation runs by default. A [hosted round trip was verified](docs/plans/2026-09-18-hosted-database-rehearsal.md#observed-hosted-result) for this tiny fixture, with source-credential reads OS-denied during restore. That evidence does not extend to Auth, other Supabase services, or the target size envelope.
+
 ## Checks
 
 ```sh
@@ -62,6 +66,9 @@ cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
 # Optional independent interoperability check: requires the Go age CLI on PATH.
 cargo test --locked --test age_interop -- --ignored
+# Developer harness: Python 3 on POSIX, fake PostgreSQL, no live services.
+cargo build --locked
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'hosted_rehearsal_test.py' -v
 ```
 
 Tests use synthetic temporary files, including restoration after removal of the source folder. They make no network calls. Passing them does not prove Supabase completeness, live recovery, or the target size envelope.
