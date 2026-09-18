@@ -4,3 +4,5 @@
 !.env.example
 /archives/
 /.sparc-local/
+/target/
+*.agekey

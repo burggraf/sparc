@@ -1,6 +1,6 @@
 # Supabase Project Archive & Restore — High-Level Product Plan
 
-**Status:** High-level design draft; Tauri and macOS-first delivery approved. React SPA with shadcn/ui is the working UI choice. No application implementation yet.
+**Status:** High-level design draft; Tauri and macOS-first delivery approved. React SPA with shadcn/ui is the working UI choice. A local Rust artifact-packaging prototype is implemented; the GUI and live Supabase export/restore are not yet implemented.
 
 **Research date:** September 18, 2026.
 
@@ -474,6 +474,8 @@ Tauri supports scoped capabilities and bundled sidecar binaries. Restrict the re
 ## 12. Phased delivery and acceptance gates
 
 ### Phase 0 — Prove recovery before building the polished UI
+
+**Progress:** The [local archive prototype](../archive-prototype.md) proves encrypted artifact packaging, complete-payload verification, local recovery without the source folder, and interoperability with the independent age CLI. This completes only the local packaging slice, not Phase 0's Supabase or target-scale acceptance gates. See its [implementation plan and results](2026-09-18-local-archive-prototype.md).
 
 Use deliberately configured disposable projects with representative data, Auth, Storage ownership policies, functions/dependencies, Vault, cron/webhooks and non-default settings. Begin with a small macOS headless recovery proof, not a polished UI or a large scaffold. Use synthetic local fixtures for archive/encryption checks, then explicitly authorized disposable Supabase projects for live round trips; never assume permission to create paid resources or change a production project.
 
