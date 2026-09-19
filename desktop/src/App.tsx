@@ -28,7 +28,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { createArchive, type ArchiveSummary, type UiError } from "@/lib/tauri";
+import {
+  createArchive,
+  restoreArchive,
+  verifyArchive,
+  type ArchiveSummary,
+  type UiError,
+} from "@/lib/tauri";
 
 type View = "home" | "create" | "open";
 
@@ -72,7 +78,7 @@ export default function App() {
 
         {view === "home" && <Home onSelect={setView} />}
         {view === "create" && <CreateFlow onBack={() => setView("home")} />}
-        {view === "open" && <OpenIntroduction onBack={() => setView("home")} />}
+        {view === "open" && <OpenFlow onBack={() => setView("home")} />}
       </main>
     </div>
   );
@@ -310,10 +316,99 @@ function CreateFlow({ onBack }: { onBack: () => void }) {
   );
 }
 
-function OpenIntroduction({ onBack }: { onBack: () => void }) {
+function OpenFlow({ onBack }: { onBack: () => void }) {
+  const [archive, setArchive] = useState("");
+  const [identity, setIdentity] = useState("");
+  const [destination, setDestination] = useState("");
+  const [busy, setBusy] = useState<"verify" | "restore">();
+  const [verified, setVerified] = useState<ArchiveSummary>();
+  const [restored, setRestored] = useState<ArchiveSummary>();
+  const [error, setError] = useState<{ label: string; detail: UiError }>();
+  const verifiedRef = useRef<HTMLDivElement>(null);
+  const restoredRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (verified) verifiedRef.current?.focus();
+  }, [verified]);
+
+  useEffect(() => {
+    if (restored) restoredRef.current?.focus();
+  }, [restored]);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
+  const invalidateVerification = () => {
+    setVerified(undefined);
+    setRestored(undefined);
+    setDestination("");
+    setError(undefined);
+  };
+
+  const chooseArchive = async () => {
+    const path = await open({ directory: true, multiple: false, title: "Choose archive folder" });
+    if (typeof path === "string") {
+      setArchive(path);
+      invalidateVerification();
+    }
+  };
+
+  const chooseIdentity = async () => {
+    const path = await open({
+      directory: false,
+      multiple: false,
+      title: "Choose recovery key",
+      filters: [{ name: "SPARC recovery key", extensions: ["agekey"] }],
+    });
+    if (typeof path === "string") {
+      setIdentity(path);
+      invalidateVerification();
+    }
+  };
+
+  const verify = async () => {
+    if (!archive || !identity || busy) return;
+    setError(undefined);
+    setRestored(undefined);
+    setBusy("verify");
+    try {
+      setVerified(await verifyArchive({ archive, identity }));
+    } catch (value) {
+      setVerified(undefined);
+      setError({ label: "Archive not verified", detail: asUiError(value) });
+    } finally {
+      setBusy(undefined);
+    }
+  };
+
+  const chooseDestination = async () => {
+    const path = await save({ title: "Choose new restore location", defaultPath: "restored-files" });
+    if (path) {
+      setDestination(path);
+      setRestored(undefined);
+      setError(undefined);
+    }
+  };
+
+  const restore = async () => {
+    if (!verified || !destination || busy) return;
+    setError(undefined);
+    setRestored(undefined);
+    setBusy("restore");
+    try {
+      setRestored(await restoreArchive({ archive, identity, destination }));
+    } catch (value) {
+      setError({ label: "Files not restored", detail: asUiError(value) });
+    } finally {
+      setBusy(undefined);
+    }
+  };
+
   return (
     <section aria-labelledby="task-title" className="space-y-6">
-      <Button variant="ghost" onClick={onBack}>
+      <Button variant="ghost" onClick={onBack} disabled={Boolean(busy)}>
         <ArrowLeft aria-hidden="true" data-icon="inline-start" />
         Back
       </Button>
@@ -322,6 +417,123 @@ function OpenIntroduction({ onBack }: { onBack: () => void }) {
         title="Open an encrypted archive"
         description="Choose an archive and its recovery key. SPARC verifies every encrypted payload before restoration."
       />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Archive inputs</CardTitle>
+          <CardDescription>The recovery key is read locally and never sent to the interface.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <PathRow
+            icon={<PackageOpen aria-hidden="true" />}
+            label="Encrypted archive"
+            value={archive}
+            action="Choose archive folder"
+            disabled={Boolean(busy)}
+            onChoose={chooseArchive}
+          />
+          <PathRow
+            icon={<FileKey2 aria-hidden="true" />}
+            label="Recovery key"
+            value={identity}
+            action="Choose recovery key"
+            disabled={Boolean(busy)}
+            onChoose={chooseIdentity}
+          />
+        </CardContent>
+        <CardFooter className="flex-col items-stretch gap-3">
+          <Button
+            size="lg"
+            onClick={verify}
+            disabled={!archive || !identity || Boolean(busy)}
+          >
+            {busy === "verify" ? (
+              <>
+                <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-start" />
+                Verifying…
+              </>
+            ) : (
+              <>
+                <ShieldCheck aria-hidden="true" data-icon="inline-start" />
+                Verify archive
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {busy === "verify" && (
+        <p role="status" aria-live="polite" className="text-sm font-medium text-muted-foreground">
+          Verifying encrypted archive…
+        </p>
+      )}
+
+      {verified && (
+        <ResultCard
+          ref={verifiedRef}
+          label="Archive verified"
+          title="Archive verified"
+          summary={verified}
+        >
+          <p className="text-sm text-muted-foreground">
+            This proves the local archive bytes are intact. It does not establish Supabase recovery.
+          </p>
+          <Separator />
+          <div className="space-y-3">
+            <div>
+              <p className="font-medium">Restore local files</p>
+              <p className="text-sm text-muted-foreground">
+                Choose a new folder path. Existing destinations are never merged or overwritten.
+              </p>
+            </div>
+            <PathRow
+              icon={<FolderInput aria-hidden="true" />}
+              label="Restore location"
+              value={destination}
+              action="Choose restore location"
+              disabled={Boolean(busy)}
+              onChoose={chooseDestination}
+            />
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={restore}
+              disabled={!destination || Boolean(busy)}
+            >
+              {busy === "restore" ? (
+                <>
+                  <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-start" />
+                  Restoring…
+                </>
+              ) : (
+                <>
+                  <FolderInput aria-hidden="true" data-icon="inline-start" />
+                  Restore local files
+                </>
+              )}
+            </Button>
+          </div>
+        </ResultCard>
+      )}
+
+      {busy === "restore" && (
+        <p role="status" aria-live="polite" className="text-sm font-medium text-muted-foreground">
+          Restoring verified local files…
+        </p>
+      )}
+
+      {restored && (
+        <ResultCard
+          ref={restoredRef}
+          label="Local files restored"
+          title="Local files restored"
+          summary={restored}
+        >
+          <p className="break-all text-sm text-muted-foreground">{destination}</p>
+          <p className="text-sm font-medium">No Supabase project was modified.</p>
+        </ResultCard>
+      )}
+      {error && <ErrorCard ref={errorRef} label={error.label} error={error.detail} />}
     </section>
   );
 }

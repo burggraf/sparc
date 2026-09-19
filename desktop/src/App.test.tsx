@@ -148,3 +148,148 @@ describe("Create archive", () => {
     expect(screen.getByRole("button", { name: "Create and verify archive" })).toBeDisabled();
   });
 });
+
+describe("Open archive", () => {
+  it("requires verification before restoring local files", async () => {
+    const user = userEvent.setup();
+    openMock
+      .mockResolvedValueOnce("/safe/archive.sparc")
+      .mockResolvedValueOnce("/separate/recovery.agekey");
+    saveMock.mockResolvedValueOnce("/safe/restored");
+    const summary = { files: 2, directories: 1, plaintextBytes: 17, ciphertextFiles: 3 };
+    invokeMock.mockResolvedValueOnce(summary).mockResolvedValueOnce(summary);
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Open archive" }));
+    const verify = screen.getByRole("button", { name: "Verify archive" });
+    expect(verify).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Restore local files" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Choose archive folder" }));
+    await user.click(screen.getByRole("button", { name: "Choose recovery key" }));
+    expect(verify).toBeEnabled();
+    await user.click(verify);
+
+    expect(invokeMock).toHaveBeenCalledWith("verify_archive", {
+      archive: "/safe/archive.sparc",
+      identity: "/separate/recovery.agekey",
+    });
+    const verified = await screen.findByRole("status", { name: "Archive verified" });
+    expect(verified).toHaveFocus();
+    expect(verified).toHaveTextContent("2 files");
+    const restore = screen.getByRole("button", { name: "Restore local files" });
+    expect(restore).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Choose restore location" }));
+    expect(restore).toBeEnabled();
+    await user.click(restore);
+
+    expect(invokeMock).toHaveBeenLastCalledWith("restore_archive", {
+      archive: "/safe/archive.sparc",
+      identity: "/separate/recovery.agekey",
+      destination: "/safe/restored",
+    });
+    const restored = await screen.findByRole("status", { name: "Local files restored" });
+    expect(restored).toHaveFocus();
+    expect(restored).toHaveTextContent("Local files restored");
+    expect(restored).not.toHaveTextContent("Supabase restored");
+    expect(restored).toHaveTextContent("/safe/restored");
+  });
+
+  it("disables selections and announces verification while busy", async () => {
+    const user = userEvent.setup();
+    openMock
+      .mockResolvedValueOnce("/safe/archive.sparc")
+      .mockResolvedValueOnce("/separate/recovery.agekey");
+    let finish!: (summary: unknown) => void;
+    invokeMock.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Open archive" }));
+    await user.click(screen.getByRole("button", { name: "Choose archive folder" }));
+    await user.click(screen.getByRole("button", { name: "Choose recovery key" }));
+    await user.click(screen.getByRole("button", { name: "Verify archive" }));
+
+    expect(screen.getByText("Verifying encrypted archive…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choose archive folder" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Choose recovery key" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Verifying…" })).toBeDisabled();
+
+    finish({ files: 0, directories: 0, plaintextBytes: 0, ciphertextFiles: 1 });
+    await screen.findByRole("status", { name: "Archive verified" });
+  });
+
+  it("invalidates verification when an input changes", async () => {
+    const user = userEvent.setup();
+    openMock
+      .mockResolvedValueOnce("/safe/archive.sparc")
+      .mockResolvedValueOnce("/separate/recovery.agekey")
+      .mockResolvedValueOnce("/separate/other.agekey");
+    invokeMock.mockResolvedValueOnce({
+      files: 1,
+      directories: 0,
+      plaintextBytes: 4,
+      ciphertextFiles: 2,
+    });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Open archive" }));
+    await user.click(screen.getByRole("button", { name: "Choose archive folder" }));
+    await user.click(screen.getByRole("button", { name: "Choose recovery key" }));
+    await user.click(screen.getByRole("button", { name: "Verify archive" }));
+    await screen.findByRole("status", { name: "Archive verified" });
+
+    await user.click(screen.getByRole("button", { name: "Choose recovery key" }));
+    expect(screen.queryByRole("status", { name: "Archive verified" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restore local files" })).not.toBeInTheDocument();
+  });
+
+  it("focuses wrong-key and destination errors", async () => {
+    const user = userEvent.setup();
+    openMock
+      .mockResolvedValueOnce("/safe/archive.sparc")
+      .mockResolvedValueOnce("/separate/recovery.agekey");
+    invokeMock.mockRejectedValueOnce({
+      code: "wrong_key_or_corrupt_archive",
+      message: "The recovery key does not match, or the archive is damaged or unsupported.",
+      outputsMayRemain: [],
+    });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Open archive" }));
+    await user.click(screen.getByRole("button", { name: "Choose archive folder" }));
+    await user.click(screen.getByRole("button", { name: "Choose recovery key" }));
+    await user.click(screen.getByRole("button", { name: "Verify archive" }));
+
+    const wrongKey = await screen.findByRole("alert", { name: "Archive not verified" });
+    expect(wrongKey).toHaveFocus();
+    expect(wrongKey).toHaveTextContent("recovery key does not match");
+  });
+
+  it("shows a safe restore failure after successful verification", async () => {
+    const user = userEvent.setup();
+    openMock
+      .mockResolvedValueOnce("/safe/archive.sparc")
+      .mockResolvedValueOnce("/separate/recovery.agekey");
+    saveMock.mockResolvedValueOnce("/safe/existing");
+    const summary = { files: 1, directories: 0, plaintextBytes: 4, ciphertextFiles: 2 };
+    invokeMock.mockResolvedValueOnce(summary).mockRejectedValueOnce({
+      code: "destination_exists",
+      message: "Choose a new output path. SPARC never overwrites existing files or folders.",
+      outputsMayRemain: [],
+    });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Open archive" }));
+    await user.click(screen.getByRole("button", { name: "Choose archive folder" }));
+    await user.click(screen.getByRole("button", { name: "Choose recovery key" }));
+    await user.click(screen.getByRole("button", { name: "Verify archive" }));
+    await screen.findByRole("status", { name: "Archive verified" });
+    await user.click(screen.getByRole("button", { name: "Choose restore location" }));
+    await user.click(screen.getByRole("button", { name: "Restore local files" }));
+
+    const error = await screen.findByRole("alert", { name: "Files not restored" });
+    expect(error).toHaveFocus();
+    expect(error).toHaveTextContent("never overwrites existing files or folders");
+  });
+});
