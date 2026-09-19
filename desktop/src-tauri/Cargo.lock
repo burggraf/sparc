@@ -3810,10 +3810,12 @@ name = "sparc-desktop"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
  "sparc",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+ "tempfile",
 ]
 
 [[package]]
