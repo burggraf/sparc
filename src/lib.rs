@@ -10,7 +10,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use age::x25519::{Identity, Recipient};
+use age::{
+    secrecy::{ExposeSecret, SecretString},
+    x25519::{Identity, Recipient},
+};
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -37,6 +40,68 @@ pub struct Artifact {
     pub path: String,
     pub bytes: u64,
     pub sha256: String,
+}
+
+/// Create a new unencrypted native age identity file with private permissions.
+pub fn create_identity_file(path: &Path) -> Result<Recipient> {
+    let parent = path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let identity = Identity::generate();
+    let recipient = identity.to_public();
+    let mut output = NamedTempFile::new_in(parent)
+        .context("recovery key parent directory must exist and be writable")?;
+    writeln!(
+        output,
+        "# SPARC recovery identity — keep private and separate\n# public key: {recipient}\n{}",
+        identity.to_string().expose_secret()
+    )?;
+    output.as_file().sync_all()?;
+    output
+        .persist_noclobber(path)
+        .map_err(io::Error::from)
+        .context("could not save recovery key; use a new file in a writable directory")?;
+    Ok(recipient)
+}
+
+/// Read one private native age identity from a private regular file.
+pub fn read_identity_file(path: &Path) -> Result<Identity> {
+    let metadata = fs::symlink_metadata(path).context("cannot read recovery identity file")?;
+    ensure!(
+        metadata.is_file(),
+        "recovery identity must be a regular file, not a symlink"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        ensure!(
+            metadata.permissions().mode() & 0o077 == 0,
+            "recovery identity is not private; restrict its permissions to 0600"
+        );
+    }
+    let mut content = String::new();
+    File::open(path)?
+        .take(16_385)
+        .read_to_string(&mut content)
+        .context("cannot read a UTF-8 recovery identity")?;
+    let secret = SecretString::from(content);
+    ensure!(
+        secret.expose_secret().len() <= 16_384,
+        "recovery identity file is too large"
+    );
+    let mut lines = secret
+        .expose_secret()
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'));
+    let line = lines.next().context("recovery identity file is empty")?;
+    ensure!(
+        lines.next().is_none(),
+        "expected exactly one native age recovery identity"
+    );
+    line.parse()
+        .map_err(|_| anyhow::anyhow!("invalid native age recovery identity"))
 }
 
 /// Encrypt a stable local directory into a new archive directory.
