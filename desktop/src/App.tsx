@@ -1,11 +1,19 @@
-import { useState } from "react";
+import * as React from "react";
+import { useEffect, useRef, useState } from "react";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   ArrowLeft,
   ArrowRight,
   Archive,
+  CheckCircle2,
+  FileKey2,
+  Folder,
   FolderInput,
+  HardDrive,
+  LoaderCircle,
   PackageOpen,
   ShieldCheck,
+  TriangleAlert,
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -20,8 +28,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { createArchive, type ArchiveSummary, type UiError } from "@/lib/tauri";
 
 type View = "home" | "create" | "open";
+
+const FALLBACK_ERROR: UiError = {
+  code: "internal_failure",
+  message: "SPARC could not complete the operation safely.",
+  outputsMayRemain: [],
+};
 
 export default function App() {
   const [view, setView] = useState<View>("home");
@@ -55,11 +70,9 @@ export default function App() {
           </AlertDescription>
         </Alert>
 
-        {view === "home" ? (
-          <Home onSelect={setView} />
-        ) : (
-          <TaskIntroduction view={view} onBack={() => setView("home")} />
-        )}
+        {view === "home" && <Home onSelect={setView} />}
+        {view === "create" && <CreateFlow onBack={() => setView("home")} />}
+        {view === "open" && <OpenIntroduction onBack={() => setView("home")} />}
       </main>
     </div>
   );
@@ -140,27 +153,304 @@ function TaskCard({
   );
 }
 
-function TaskIntroduction({ view, onBack }: { view: Exclude<View, "home">; onBack: () => void }) {
-  const create = view === "create";
+function CreateFlow({ onBack }: { onBack: () => void }) {
+  const [source, setSource] = useState("");
+  const [identity, setIdentity] = useState("");
+  const [archive, setArchive] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [summary, setSummary] = useState<ArchiveSummary>();
+  const [error, setError] = useState<UiError>();
+  const resultRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (summary) resultRef.current?.focus();
+  }, [summary]);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
+  const clearOutcome = () => {
+    setSummary(undefined);
+    setError(undefined);
+  };
+
+  const chooseSource = async () => {
+    const path = await open({ directory: true, multiple: false, title: "Choose source folder" });
+    if (typeof path === "string") {
+      setSource(path);
+      clearOutcome();
+    }
+  };
+
+  const chooseIdentity = async () => {
+    const path = await save({
+      title: "Save recovery key",
+      defaultPath: "sparc-recovery.agekey",
+      filters: [{ name: "SPARC recovery key", extensions: ["agekey"] }],
+    });
+    if (path) {
+      setIdentity(path);
+      clearOutcome();
+    }
+  };
+
+  const chooseArchive = async () => {
+    const path = await save({ title: "Choose new archive location", defaultPath: "archive.sparc" });
+    if (path) {
+      setArchive(path);
+      clearOutcome();
+    }
+  };
+
+  const create = async () => {
+    if (!source || !identity || !archive || busy) return;
+    clearOutcome();
+    setBusy(true);
+    try {
+      setSummary(await createArchive({ source, archive, identity }));
+    } catch (value) {
+      setError(asUiError(value));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="task-title" className="space-y-6">
+      <Button variant="ghost" onClick={onBack} disabled={busy}>
+        <ArrowLeft aria-hidden="true" data-icon="inline-start" />
+        Back
+      </Button>
+      <TaskHeading
+        eyebrow="Create archive"
+        title="Create an encrypted archive"
+        description="Choose a quiet source folder, a separate recovery-key location, and a new archive path."
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Archive locations</CardTitle>
+          <CardDescription>All outputs must be new. Existing files and folders are never replaced.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <PathRow
+            icon={<Folder aria-hidden="true" />}
+            label="Source folder"
+            value={source}
+            action="Choose source folder"
+            disabled={busy}
+            onChoose={chooseSource}
+          />
+          <PathRow
+            icon={<FileKey2 aria-hidden="true" />}
+            label="Recovery key"
+            value={identity}
+            action="Save recovery key"
+            disabled={busy}
+            onChoose={chooseIdentity}
+          />
+          <PathRow
+            icon={<HardDrive aria-hidden="true" />}
+            label="Encrypted archive"
+            value={archive}
+            action="Choose archive location"
+            disabled={busy}
+            onChoose={chooseArchive}
+          />
+        </CardContent>
+        <CardFooter className="flex-col items-stretch gap-3">
+          <Alert className="bg-background">
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle>The recovery key is unencrypted</AlertTitle>
+            <AlertDescription>
+              Save it somewhere protected and separate. Anyone with this file can open the archive;
+              losing it prevents recovery.
+            </AlertDescription>
+          </Alert>
+          <Button
+            size="lg"
+            onClick={create}
+            disabled={!source || !identity || !archive || busy}
+          >
+            {busy ? (
+              <>
+                <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-start" />
+                Creating…
+              </>
+            ) : (
+              <>
+                <ShieldCheck aria-hidden="true" data-icon="inline-start" />
+                Create and verify archive
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {busy && (
+        <p role="status" aria-live="polite" className="text-sm font-medium text-muted-foreground">
+          Creating encrypted archive…
+        </p>
+      )}
+      {summary && (
+        <ResultCard
+          ref={resultRef}
+          label="Archive created"
+          title="Archive created and verified"
+          summary={summary}
+        >
+          <p className="break-all text-sm text-muted-foreground">{archive}</p>
+          <p className="text-sm font-medium">Keep the recovery key separate from this archive.</p>
+        </ResultCard>
+      )}
+      {error && <ErrorCard ref={errorRef} label="Archive not created" error={error} />}
+    </section>
+  );
+}
+
+function OpenIntroduction({ onBack }: { onBack: () => void }) {
   return (
     <section aria-labelledby="task-title" className="space-y-6">
       <Button variant="ghost" onClick={onBack}>
         <ArrowLeft aria-hidden="true" data-icon="inline-start" />
         Back
       </Button>
-      <div className="max-w-2xl space-y-2">
-        <p className="text-sm font-medium text-muted-foreground">
-          {create ? "Create archive" : "Verify and restore"}
-        </p>
-        <h2 id="task-title" className="text-3xl font-semibold tracking-tight">
-          {create ? "Create an encrypted archive" : "Open an encrypted archive"}
-        </h2>
-        <p className="text-base leading-7 text-muted-foreground">
-          {create
-            ? "Choose a quiet source folder, a separate recovery-key location, and a new archive path."
-            : "Choose an archive and its recovery key. SPARC verifies every encrypted payload before restoration."}
-        </p>
-      </div>
+      <TaskHeading
+        eyebrow="Verify and restore"
+        title="Open an encrypted archive"
+        description="Choose an archive and its recovery key. SPARC verifies every encrypted payload before restoration."
+      />
     </section>
   );
+}
+
+function TaskHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="max-w-2xl space-y-2">
+      <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p>
+      <h2 id="task-title" className="text-3xl font-semibold tracking-tight">
+        {title}
+      </h2>
+      <p className="text-base leading-7 text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function PathRow({
+  icon,
+  label,
+  value,
+  action,
+  disabled,
+  onChoose,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  action: string;
+  disabled: boolean;
+  onChoose: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border bg-background p-3">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground [&>svg]:size-4">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="truncate text-xs text-muted-foreground" title={value || "Not selected"}>
+          {value || "Not selected"}
+        </p>
+      </div>
+      <Button variant="outline" onClick={onChoose} disabled={disabled}>
+        {action}
+      </Button>
+    </div>
+  );
+}
+
+const ResultCard = React.forwardRef<
+  HTMLDivElement,
+  {
+    label: string;
+    title: string;
+    summary: ArchiveSummary;
+    children: React.ReactNode;
+  }
+>(({ label, title, summary, children }, ref) => (
+  <Card ref={ref} role="status" aria-label={label} tabIndex={-1} className="border-emerald-200">
+    <CardHeader>
+      <div className="flex items-center gap-2 text-emerald-700">
+        <CheckCircle2 aria-hidden="true" className="size-5" />
+        <CardTitle>{title}</CardTitle>
+      </div>
+      <CardDescription>Every encrypted payload passed authentication, size, and hash checks.</CardDescription>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Metric value={summary.files} label={plural(summary.files, "file")} />
+        <Metric value={summary.directories} label={plural(summary.directories, "directory")} />
+        <Metric value={summary.plaintextBytes} label="plaintext bytes" />
+        <Metric value={summary.ciphertextFiles} label="encrypted files" />
+      </div>
+      {children}
+    </CardContent>
+  </Card>
+));
+ResultCard.displayName = "ResultCard";
+
+function Metric({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="rounded-lg bg-muted p-3">
+      <p className="text-lg font-semibold tabular-nums">{value.toLocaleString()}</p>
+      <p className="text-xs text-muted-foreground"> {label}</p>
+    </div>
+  );
+}
+
+const ErrorCard = React.forwardRef<HTMLDivElement, { label: string; error: UiError }>(
+  ({ label, error }, ref) => (
+    <Alert ref={ref} variant="destructive" aria-label={label} tabIndex={-1}>
+      <TriangleAlert aria-hidden="true" />
+      <AlertTitle>{label}</AlertTitle>
+      <AlertDescription>
+        <p>{error.message}</p>
+        {error.outputsMayRemain.length > 0 && (
+          <p>These outputs may remain: {error.outputsMayRemain.join(", ")}.</p>
+        )}
+      </AlertDescription>
+    </Alert>
+  ),
+);
+ErrorCard.displayName = "ErrorCard";
+
+function asUiError(value: unknown): UiError {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "code" in value &&
+    typeof value.code === "string" &&
+    "message" in value &&
+    typeof value.message === "string" &&
+    "outputsMayRemain" in value &&
+    Array.isArray(value.outputsMayRemain) &&
+    value.outputsMayRemain.every((item) => typeof item === "string")
+  ) {
+    return value as UiError;
+  }
+  return FALLBACK_ERROR;
+}
+
+function plural(value: number, noun: string) {
+  return `${noun}${value === 1 ? "" : "s"}`;
 }
