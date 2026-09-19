@@ -2,7 +2,7 @@
 
 > **REQUIRED SUB-SKILL:** Use the executing-plans skill to implement this plan task-by-task.
 
-**Goal:** Build an unsigned, locally testable macOS Tauri app that creates, verifies and restores the existing encrypted local artifact archives through two guided UI flows.
+**Goal:** Build an ad-hoc-signed, locally testable macOS Tauri app—with no Developer ID signing or notarization—that creates, verifies and restores the existing encrypted local artifact archives through two guided UI flows.
 
 **Architecture:** Add an isolated `desktop/` React/Vite/Tauri project whose Rust crate depends directly on the root `sparc` library. Move recovery-identity file handling from the CLI into the shared library, then expose three narrow Tauri commands returning bounded summaries and safe errors. Keep frontend state in memory and grant only native open/save dialog permissions.
 
@@ -15,7 +15,7 @@
 ## Non-goals and invariants
 
 - No Supabase connection, export or restore.
-- No shell, sidecar, unrestricted filesystem plugin, history, browser storage, telemetry, cancellation, byte progress, Keychain, signing or notarization.
+- No shell, sidecar, unrestricted filesystem plugin, history, browser storage, telemetry, cancellation, byte progress, Keychain, Developer ID signing or notarization.
 - The root `sparc` library remains the archive implementation. The UI never executes the CLI.
 - Existing destinations remain no-clobber. Partial output may remain after failure.
 - Private identities are never returned to JavaScript, printed, logged or placed in command arguments.
@@ -441,11 +441,11 @@ git commit -m "feat: add guided archive verification and restore"
 Add a small repository check script invocation (inline Python is sufficient) that initially fails unless documentation contains all of:
 
 - `desktop/` development command;
-- unsigned local `.app` build command and output location;
+- ad-hoc-signed local `.app` build command and output location;
 - local-artifacts-only warning;
 - unencrypted recovery-key warning;
 - no Supabase export/restore claim;
-- no signing/notarization claim.
+- no Developer ID signing/notarization claim.
 
 Run it before editing docs and observe failure.
 
@@ -460,7 +460,7 @@ npm run tauri dev
 npm run tauri build -- --bundles app
 ```
 
-State the exact generated `.app` location observed on this machine. Explain macOS unsigned-app behavior without suggesting users bypass system security for an untrusted download. Keep the CLI instructions.
+State the exact generated `.app` location observed on this machine. Explain macOS ad-hoc-signed app behavior without suggesting users bypass system security for an untrusted download. Keep the CLI instructions.
 
 ### Step 3: Run full fresh verification
 
@@ -501,16 +501,26 @@ Push through the existing authenticated HTTPS fallback without changing `origin`
 
 ## Final acceptance checklist
 
-- [ ] Every behavioral test was observed failing for the expected reason before implementation.
-- [ ] The desktop invokes the root Rust library directly.
-- [ ] Create performs keygen, pack and independent verify.
-- [ ] Open requires verify before restore.
-- [ ] Existing destinations are never overwritten.
-- [ ] Errors are structured, bounded and secret-free.
-- [ ] No generic shell/filesystem power is granted to the renderer.
-- [ ] No frontend persistence or telemetry exists.
-- [ ] Root and desktop checks pass from clean installs/locks.
-- [ ] An unsigned local `.app` is produced.
-- [ ] Automated integration evidence passes.
+- [x] Every behavioral test was observed failing for the expected reason before implementation.
+- [x] The desktop invokes the root Rust library directly.
+- [x] Create performs keygen, pack and independent verify.
+- [x] Open requires verify before restore.
+- [x] Existing destinations are never overwritten.
+- [x] Errors are structured, bounded and secret-free.
+- [x] No generic shell/filesystem power is granted to the renderer.
+- [x] No frontend persistence or telemetry exists.
+- [x] Root and desktop checks pass from clean installs/locks.
+- [x] An ad-hoc-signed local `.app` with no Developer ID signature or notarization ticket is produced.
+- [x] Automated integration evidence passes.
 - [ ] Owner interactive smoke result is recorded separately.
-- [ ] Supabase/full-backup/scale exclusions remain prominent.
+- [x] Supabase/full-backup/scale exclusions remain prominent.
+
+## Observed execution result — 2026-09-19
+
+Expected RED states were observed before implementation for shared identity APIs, the desktop task shell, Create controls, Open/Verify/Restore controls, and the local ad-hoc packaging contract. The implemented desktop suite now has four archive-command tests and one configuration/capability contract test. The frontend suite has nine workflow tests.
+
+The real command-layer integration test creates a recovery identity and encrypted archive, verifies it independently, removes the source, restores to a new destination, and compares recovered bytes. Separate tests cover existing outputs, wrong keys, ciphertext corruption, and overlapping operations. The built app executable also remained running during a startup smoke check and stopped cleanly.
+
+The final bundle is `desktop/src-tauri/target/release/bundle/macos/SPARC.app`. Its code signature is ad-hoc, has no Team ID, and has no stapled notarization ticket. One earlier local attempt inherited installed Developer ID/notarization credentials and was automatically signed and notarized by Tauri; it was not published. The checked-in configuration now forces ad-hoc signing, and acceptance builds explicitly remove Apple signing/notarization environment variables.
+
+Automated browser rendering was unavailable because the installed browser wrapper was below its supported version and Chrome's remote-debugging connection required interactive approval. No global browser tooling was changed. Renderer behavior remains covered by the nine frontend tests. The owner must still click through Create and Open in the actual WKWebView; that result is intentionally pending rather than inferred.

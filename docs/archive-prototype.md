@@ -15,6 +15,22 @@ sparc unpack ARCHIVE_DIR DESTINATION_DIR IDENTITY_FILE
 
 All output destinations must be new. Existing empty directories also count as existing: the prototype will not overwrite or merge them.
 
+## Local desktop alpha
+
+A macOS Tauri alpha now wraps these same Rust operations in two guided flows. It can create a new unencrypted recovery key, pack and independently verify a local source folder, or verify an existing archive before restoring its files locally. **Local artifact archives only — it is not a Supabase exporter, Supabase restore tool or production backup application.**
+
+```sh
+cd desktop
+npm ci
+npm run tauri dev
+# Build an ad-hoc-signed local application bundle:
+npm run tauri build -- --bundles app
+```
+
+The local bundle is `desktop/src-tauri/target/release/bundle/macos/SPARC.app` relative to the repository. It is ad-hoc signed for local execution; it is **not Developer ID signed or notarized** and is not for redistribution. The renderer receives only bounded counts and safe errors from three named Rust commands. It has native open/save dialogs but no generic shell or unrestricted filesystem plugin. Selected paths live only in current React memory; there is no history, browser storage, Keychain integration, telemetry, cancellation or detailed progress.
+
+The desktop alpha does not change the archive format, limits or partial-output behavior below. A failed create can leave the unencrypted recovery key and a partial archive; a failed restore can leave a partial private destination. Retry only with new output paths.
+
 ## Recovery key
 
 The prototype uses native age X25519 identities and recipients. `keygen` writes the private identity with owner-only permissions and prints only the public `age1...` recipient. Only the recipient belongs in a command argument.

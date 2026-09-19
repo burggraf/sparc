@@ -6,7 +6,7 @@ Archive as much of a project as supported, collect missing settings through guid
 
 ## Status
 
-Early feasibility prototype: a shared Rust library and developer CLI can pack, verify and unpack local artifact folders using age encryption, and produce declaration-only offline database plans. **This is not yet a Supabase exporter/restorer or a desktop app. Do not use it as your only backup.**
+Early feasibility prototype: a shared Rust library, developer CLI and local macOS desktop alpha can pack, verify and unpack local artifact folders using age encryption. The CLI also produces declaration-only offline database plans. **This is not a Supabase exporter/restorer or a production backup app. Do not use it as your only backup.**
 
 See the [high-level product plan](docs/plans/2026-09-18-supabase-project-archive-design.md), [prototype implementation plan](docs/plans/2026-09-18-local-archive-prototype.md), and [experimental archive format and security limits](docs/archive-prototype.md).
 
@@ -34,7 +34,29 @@ target/debug/sparc verify "$DEMO/archive" "$DEMO/recovery.agekey"
 target/debug/sparc unpack "$DEMO/archive" "$DEMO/restored" "$DEMO/recovery.agekey"
 ```
 
-The recovery key file is **unencrypted**: protect it separately. Output directories must not already exist. Files are restored locally, not to Supabase. An interrupted operation can leave partial output; resumable transfers and the GUI are not implemented yet.
+The recovery key file is **unencrypted**: protect it separately. Output directories must not already exist. Files are restored locally, not to Supabase. An interrupted operation can leave partial output; resumable transfers are not implemented yet.
+
+## Try the local macOS desktop alpha
+
+The desktop alpha provides two guided flows over the same Rust engine: create and verify an encrypted archive, or verify and restore one locally. **Local artifact archives only — this does not back up Supabase yet.**
+
+Development requires Node.js, npm, Rust and Xcode Command Line Tools:
+
+```sh
+cd desktop
+npm ci
+npm run tauri dev
+```
+
+Build a local `.app` for this Mac:
+
+```sh
+npm run tauri build -- --bundles app
+```
+
+The app is written to `desktop/src-tauri/target/release/bundle/macos/SPARC.app` when the command is run from the repository root, or `src-tauri/target/release/bundle/macos/SPARC.app` from `desktop/`. This developer build is ad-hoc signed for local execution; it is **not Developer ID signed or notarized** and is not intended for redistribution. Do not bypass macOS security warnings for an app obtained from an untrusted source.
+
+The recovery key is an **unencrypted recovery key** stored separately from the archive. The UI keeps paths only in memory, never displays private-key contents, refuses existing destinations and reports that partial private output may remain after failure or interruption. It has no Supabase connection, history, cancellation, resumable operations, Keychain integration or telemetry.
 
 ## Try the offline database planner
 
@@ -69,6 +91,10 @@ cargo test --locked --test age_interop -- --ignored
 # Developer harness: Python 3 on POSIX, fake PostgreSQL, no live services.
 cargo build --locked
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'hosted_rehearsal_test.py' -v
+# Desktop frontend and native command layer.
+(cd desktop && npm ci && npm test && npm run build)
+cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked
+cargo clippy --manifest-path desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings
 ```
 
 Tests use synthetic temporary files, including restoration after removal of the source folder. They make no network calls. Passing them does not prove Supabase completeness, live recovery, or the target size envelope.

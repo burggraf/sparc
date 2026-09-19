@@ -9,7 +9,7 @@
 ## Decisions
 
 - Tauri 2 on macOS, with React, TypeScript, Vite, Tailwind CSS and a minimal set of shadcn/ui components.
-- Local development launch plus an unsigned, double-clickable `.app` build for this Mac.
+- Local development launch plus an ad-hoc-signed, double-clickable `.app` build for this Mac, with no Developer ID signing or notarization.
 - Two guided tasks rather than exposing four low-level CLI commands:
   - **Create archive:** choose a source, save a new recovery key, choose a new archive path, pack, then verify.
   - **Open archive:** choose an archive and recovery key, verify, then optionally restore to a new local folder.
@@ -119,7 +119,7 @@ Do not add a browser E2E framework, visual snapshot suite or mocked duplicate of
 1. Existing root formatting, tests, independent age interoperability and Clippy remain green.
 2. Desktop Rust command tests pass.
 3. Frontend tests, strict TypeScript checking and Vite production build pass.
-4. Tauri produces an unsigned local macOS `.app`.
+4. Tauri produces an ad-hoc-signed local macOS `.app` with no Developer ID signature or notarization ticket.
 5. A smoke run through the app creates and verifies a synthetic archive, removes the source, restores it and confirms matching bytes.
 6. No private key appears in the UI, captured output, frontend storage or logs.
 7. Git contains no generated archives, recovery identities, build output or private fixtures.
@@ -131,7 +131,7 @@ Do not add a browser E2E framework, visual snapshot suite or mocked duplicate of
 - Detailed transfer progress, cancellation, checkpoints and resumption.
 - Existing-key reuse, passphrase identities and Keychain integration.
 - History, recent archives and persistent application state.
-- Signing, notarization, DMG packaging, auto-update and cross-architecture builds.
+- Developer ID signing, notarization, DMG packaging, auto-update and cross-architecture builds.
 - Release-quality branding and visual polish.
 - Scale validation.
 
@@ -145,3 +145,13 @@ The implementation should follow current official guidance checked during design
 - [Tauri macOS application bundles](https://v2.tauri.app/distribute/macos-application-bundle/)
 - [shadcn/ui Vite installation](https://ui.shadcn.com/docs/installation/vite)
 - [Vite documentation](https://vite.dev/)
+
+## Observed implementation result — 2026-09-19
+
+The alpha is implemented as designed. The Tauri shell calls the shared Rust library directly through three bounded commands. Automated command tests exercise a real create, independent verify, source removal, and restore round trip. The React tests cover both guided flows, verification invalidation, busy states, safe errors, and the local-only wording.
+
+The generated arm64 bundle is at `desktop/src-tauri/target/release/bundle/macos/SPARC.app`. It is ad-hoc signed (`Signature=adhoc`, no Team ID) and has no stapled notarization ticket. A durable configuration test locks the main-window capability set to core plus native open/save dialogs and locks local packaging to ad-hoc signing.
+
+One initial packaging attempt inherited Developer ID and notarization credentials from the local environment and Tauri automatically signed, submitted, and stapled that build. No artifact was published. The repository now fails closed with `bundle.macOS.signingIdentity` set to `-`, and acceptance builds remove Apple signing/notarization environment variables. The replacement bundle was confirmed ad-hoc and unstapled.
+
+The built executable remained running during an automated startup smoke check and was then stopped cleanly. Interactive clicking in the Tauri WKWebView remains an owner smoke test; it is not claimed as passed here. All Supabase export/restore, full-project recovery, signing for distribution, scale, cancellation, and deferred service coverage exclusions remain unchanged.
