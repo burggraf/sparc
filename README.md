@@ -78,7 +78,7 @@ Shared API: `sparc::database::plan_database(&[u8])` and `plan_database_file(&Pat
 
 ## Developer-only hosted fixture experiment
 
-An explicitly authorized operator can rehearse one synthetic, schema-scoped native PostgreSQL 17 fixture through the existing encrypted archive CLI. See the [bounded rehearsal plan, safety requirements, and parent-only commands](docs/plans/2026-09-18-hosted-database-rehearsal.md). This is **not** the Supabase dump recipe, native/CLI parity, full database recovery, or Auth recovery. Its Python fake-process tests are offline; no hosted operation runs by default. A [hosted round trip was verified](docs/plans/2026-09-18-hosted-database-rehearsal.md#observed-hosted-result) for this tiny fixture, with source-credential reads OS-denied during restore. That evidence does not extend to Auth, other Supabase services, or the target size envelope.
+An explicitly authorized operator can rehearse one synthetic, schema-scoped native PostgreSQL 17 fixture through the existing encrypted archive CLI. See the [bounded rehearsal plan, safety requirements, and parent-only commands](docs/plans/2026-09-18-hosted-database-rehearsal.md). This is **not** the Supabase dump recipe, native/CLI parity, full database recovery, or Auth recovery. Its Python fake-process tests are offline; no hosted operation runs by default. A [hosted round trip was verified](docs/plans/2026-09-18-hosted-database-rehearsal.md#observed-hosted-result) for this tiny fixture, with source-credential reads OS-denied during restore. That evidence does not extend to Auth, other Supabase services, or the target size envelope. A subsequent [pinned upstream-script/native-client rehearsal](docs/plans/2026-09-20-native-recipe-implementation.md#observed-result--2026-09-20) also passed for the same tiny schema, including live TLS rejection checks and source-input-denied restoration. This is not unmodified Supabase CLI/Docker parity or general database support.
 
 ## Checks
 
@@ -90,7 +90,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --test age_interop -- --ignored
 # Developer harness: Python 3 on POSIX, fake PostgreSQL, no live services.
 cargo build --locked
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'hosted_rehearsal_test.py' -v
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p '*_test.py' -v
 # Desktop frontend and native command layer.
 (cd desktop && npm ci && npm test && npm run build)
 cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked
