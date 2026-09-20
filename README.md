@@ -82,6 +82,8 @@ An explicitly authorized operator can rehearse one synthetic, schema-scoped nati
 
 General application-database work now includes a [read-only schema inspector](docs/plans/2026-09-20-application-database-inspection-implementation.md#parent-verified-result--2026-09-20). It collects structural catalogs for explicitly selected application schemas and reports review blockers without reading application rows or routine bodies. Local PG17 tests and read-only inspection of both hosted test projects passed. This developer helper does **not** export or restore general databases; readiness flags remain false.
 
+The [native capture-route review](docs/plans/2026-09-20-database-capture-route-vetting.md) favors a bounded native PostgreSQL evaluation, not an approved general recovery engine. A [local permission-preservation experiment](docs/plans/2026-09-20-native-permissions-experiment-results.md) verified the fixed fixture's ownership/ACL/RLS behavior on a compatible target and reproduced a critical counterexample: a successful restore can retain unwanted destination default grants and expose restored data. Destination privilege preflight is therefore required; no automatic revocation or hosted changes are authorized by this experiment.
+
 ## Checks
 
 ```sh
