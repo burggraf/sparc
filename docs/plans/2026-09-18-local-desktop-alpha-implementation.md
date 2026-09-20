@@ -512,7 +512,7 @@ Push through the existing authenticated HTTPS fallback without changing `origin`
 - [x] Root and desktop checks pass from clean installs/locks.
 - [x] An ad-hoc-signed local `.app` with no Developer ID signature or notarization ticket is produced.
 - [x] Automated integration evidence passes.
-- [ ] Owner interactive smoke result is recorded separately.
+- [x] User-authorized interactive smoke result is recorded separately.
 - [x] Supabase/full-backup/scale exclusions remain prominent.
 
 ## Observed execution result — 2026-09-19
@@ -523,4 +523,4 @@ The real command-layer integration test creates a recovery identity and encrypte
 
 The final bundle is `desktop/src-tauri/target/release/bundle/macos/SPARC.app`. Its code signature is ad-hoc, has no Team ID, and has no stapled notarization ticket. One earlier local attempt inherited installed Developer ID/notarization credentials and was automatically signed and notarized by Tauri; it was not published. The checked-in configuration now forces ad-hoc signing, and acceptance builds explicitly remove Apple signing/notarization environment variables.
 
-Automated browser rendering was unavailable because the installed browser wrapper was below its supported version and Chrome's remote-debugging connection required interactive approval. No global browser tooling was changed. Renderer behavior remains covered by the nine frontend tests. The owner must still click through Create and Open in the actual WKWebView; that result is intentionally pending rather than inferred.
+Automated browser rendering was unavailable because the installed browser wrapper was below its supported version and Chrome's remote-debugging connection required interactive approval. No global browser tooling was changed. The user then authorized direct interaction with the already-running Tauri window. Using its actual macOS dialogs, the smoke flow selected the synthetic source, saved a recovery key and archive, created and verified the archive, reopened and verified it, and restored to a new destination. The UI reported 2 files, 1 directory, 46 plaintext bytes, and 3 encrypted files. An independent recursive diff confirmed the restored files match the source.
