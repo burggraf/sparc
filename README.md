@@ -84,6 +84,8 @@ General application-database work now includes a [read-only schema inspector](do
 
 The [native capture-route review](docs/plans/2026-09-20-database-capture-route-vetting.md) favors a bounded native PostgreSQL evaluation, not an approved general recovery engine. A [local permission-preservation experiment](docs/plans/2026-09-20-native-permissions-experiment-results.md) verified the fixed fixture's ownership/ACL/RLS behavior on a compatible target and reproduced a critical counterexample: a successful restore can retain unwanted destination default grants and expose restored data. The [destination permission preflight](docs/plans/2026-09-20-destination-permission-preflight-results.md) is a read-only PG17 prerequisite observer that compares an explicit expected catalog contract: database/schema ownership and ACLs, roles/memberships, and selected creators' global/scoped defaults. It detects mismatches without normalizing destination state; all readiness flags remain false. It is not hosted support or a general restore authorization. No automatic revocation or hosted changes are authorized by these experiments.
 
+A [native PG17 literal-selector experiment](docs/plans/2026-09-20-native-literal-schema-selection-results.md) proved exact selectors for 19 tricky schema names with complete restored-inventory comparison and decoy exclusion; a missing selection fails. It does not establish dependency completeness or general recovery.
+
 ## Checks
 
 ```sh
