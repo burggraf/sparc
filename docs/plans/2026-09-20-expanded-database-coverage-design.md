@@ -1,6 +1,6 @@
 # Expanded database coverage — proposed next milestone
 
-Status: owner selected a combined schema, roles and migration-history milestone. [Implementation plan](2026-09-20-expanded-database-implementation.md) written; strict metadata validation and non-replaying SQL fragments are implemented and locally tested. Combined capture/restore and hosted verification are still pending; no hosted changes authorized by this document.
+Status: the owner-authorized combined synthetic schema, roles and migration-history rehearsal passed locally and on the two hosted test projects. See [observed results](2026-09-20-expanded-database-implementation.md#combined-hosted-result--2026-09-20). This document describes the design; the specific operator authorization was separately recorded and has been consumed.
 
 ## Selected scope
 
@@ -17,7 +17,7 @@ The published native recipe restores one fixed schema with three tables, an owne
 
 Preserve the existing recipe and regression tests. Do not weaken its guard to accept a larger arbitrary catalog, add a generic SQL execution interface, or invent a plugin/profile framework. Decide the smallest shared change only after reading the expanded fixture and tests end to end.
 
-## Coverage and acceptance matrix
+## Coverage and acceptance matrix (baseline at planning)
 
 | Area | Evidence now | Next required evidence |
 | --- | --- | --- |
@@ -60,7 +60,7 @@ Inspected Supabase CLI commit `21db855916f2c2b12f61cde923a27094b8528b23`, files 
 
 ## Hosted authorization boundary
 
-Both retained Free projects contain the old fixture. The prior one-time cleanup/reuse approval is consumed. No further source writes, destination cleanup, role changes or migration-history writes are authorized here.
+At planning time both projects held the old fixture and the prior cleanup permission was consumed. The owner subsequently authorized the exact combined source additions and destination fixture-only cleanup/restore. That single rehearsal has now completed; both projects hold the expanded fixture. This design does not authorize another cleanup, retry or broader mutation.
 
 Before the combined rehearsal runs live, present the exact source fixture extension, custom roles/membership/default privileges, migration-history objects/rows, and destination preparation plan. Include explicit RESTRICT drops, validated previous recovery archives and the failure/quarantine procedure. Ask approval for those named operations only, explicitly identifying cluster-wide role effects and migration-schema writes. Neither project will be deleted/reset; no unrelated schema/service or paid resource is involved. A failure does not authorize retry or broader cleanup.
 
@@ -77,7 +77,7 @@ SPARC_TEST_PG17_BIN=/path/to/postgresql17/bin PYTHONDONTWRITEBYTECODE=1 \
   python3 -m unittest discover -s tests -p 'expanded_metadata*_test.py' -v
 ```
 
-This is metadata preparation only: no expanded schema dump/archive round trip, default-privilege behavioral proof, hosted role permission proof or live migration-history capture has occurred. Neither hosted project was touched. Normal test discovery skips the server test unless explicitly enabled.
+That initial preparation was metadata-only and touched neither hosted project. It was followed by the independently reviewed full fixture implementation and successful combined hosted rehearsal linked above. Normal test discovery skips server tests unless explicitly enabled.
 
 ## Done means
 
