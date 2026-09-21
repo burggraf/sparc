@@ -88,6 +88,8 @@ The [native capture-route review](docs/plans/2026-09-20-database-capture-route-v
 
 A [native PG17 literal-selector experiment](docs/plans/2026-09-20-native-literal-schema-selection-results.md) proved exact selectors for 19 tricky schema names with complete restored-inventory comparison and decoy exclusion; a missing selection fails. It does not establish dependency completeness or general recovery.
 
+A subsequent [native recovery-profile design](docs/plans/2026-09-20-native-recovery-profile-design.md) and [verified local result](docs/plans/2026-09-20-native-recovery-profile-results.md) compose those observers and selectors with one native custom dump, encrypted archive round trip, independently initialized target, non-superuser transactional restore, exact inventory/ownership/ACL/default/FK checks, fail-closed cases, and late-DDL rollback. The independent PG17.9 suite passed all 79 tests. This proves only a trusted, quiescent, fixed non-public fixture; catalog coverage remains incomplete and it does not establish arbitrary archive authenticity, provider-owned `public` restoration, hosted behavior, concurrency, or scale.
+
 ## Checks
 
 ```sh
